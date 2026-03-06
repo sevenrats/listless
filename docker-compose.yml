@@ -1,0 +1,11 @@
+services:
+  listless:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - listless-data:/app/data
+
+volumes:
+  listless-data:
