@@ -1,7 +1,9 @@
 """Cache-first ID mapping service: IMDb ↔ TMDb ↔ TVDb.
 
 Translates external IDs using the TMDb ``/find`` and ``/external_ids``
-endpoints, with a SQLite write-through cache so repeat look-ups are free.
+endpoints, with a database write-through cache so repeat look-ups are free.
+
+Supports both SQLite and PostgreSQL backends.
 """
 
 import logging
@@ -9,13 +11,21 @@ import time
 
 import httpx
 from sqlalchemy import func, select
-from sqlalchemy.dialects.sqlite import insert as sqlite_upsert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from listless.config import settings
 from listless.db.models import IdMapping, MappingType
 
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Dialect-aware INSERT … ON CONFLICT helpers
+# ---------------------------------------------------------------------------
+
+if settings.is_postgres:
+    from sqlalchemy.dialects.postgresql import insert as _dialect_insert
+else:
+    from sqlalchemy.dialects.sqlite import insert as _dialect_insert
 
 
 # ---------------------------------------------------------------------------
@@ -25,7 +35,7 @@ log = logging.getLogger(__name__)
 async def seed_mapping_types(db: AsyncSession) -> None:
     """Ensure the ``tv`` and ``movie`` rows exist in *mapping_types*."""
     for t in ("tv", "movie"):
-        stmt = sqlite_upsert(MappingType).values(type=t).on_conflict_do_nothing()
+        stmt = _dialect_insert(MappingType).values(type=t).on_conflict_do_nothing()
         await db.execute(stmt)
     await db.commit()
 
@@ -35,8 +45,7 @@ async def seed_mapping_types(db: AsyncSession) -> None:
 # ---------------------------------------------------------------------------
 
 class IdMappingService:
-    """Resolve external media IDs with a SQLite-backed write-through cache."""
-
+    """Resolve external media IDs with a database-backed write-through cache."""
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
         self._tmdb_key = settings.tmdb_api_key
@@ -54,7 +63,7 @@ class IdMappingService:
         tvdb: str | None = None,
     ) -> None:
         now = int(time.time())
-        stmt = sqlite_upsert(IdMapping).values(
+        stmt = _dialect_insert(IdMapping).values(
             imdb=imdb,
             tmdb=tmdb,
             tvdb=tvdb,
@@ -81,7 +90,7 @@ class IdMappingService:
         tvdb: str | None = None,
     ) -> None:
         now = int(time.time())
-        stmt = sqlite_upsert(IdMapping).values(
+        stmt = _dialect_insert(IdMapping).values(
             imdb=None,
             tmdb=tmdb,
             tvdb=tvdb,

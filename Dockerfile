@@ -14,14 +14,16 @@ RUN pip install --no-cache-dir uv && \
     apk add --no-cache \
         libgcc \
         libstdc++ \
-        libffi && \
+        libffi \
+        libpq && \
     apk add --no-cache --virtual .build-deps \
         build-base \
         gcc \
         musl-dev \
         cargo \
         rust \
-        libffi-dev && \
+        libffi-dev \
+        postgresql-dev && \
     uv export --format requirements.txt --no-dev -o requirements.txt && \
     uv pip sync --system requirements.txt && \
     apk del .build-deps

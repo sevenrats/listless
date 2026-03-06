@@ -9,7 +9,7 @@ A self-hosted custom-list server that speaks the **Radarr** and **Sonarr** impor
 
 Listless is a lightweight FastAPI server that aggregates titles from multiple upstream sources and returns them in the JSON format Radarr and Sonarr expect from custom lists. Each **provider** exposes one or more endpoints: movie endpoints return `[{"TmdbId": …}]` for Radarr, and series endpoints return `[{"TvdbId": …}]` for Sonarr.
 
-An internal **ID-mapping service** backed by a SQLite write-through cache translates between IMDb, TMDB, and TVDB identifiers automatically using the TMDB API, so providers only need to know one external ID to produce the right output.
+An internal **ID-mapping service** backed by a database write-through cache (SQLite or PostgreSQL) translates between IMDb, TMDB, and TVDB identifiers automatically using the TMDB API, so providers only need to know one external ID to produce the right output.
 
 ## Providers
 
@@ -42,6 +42,14 @@ An internal **ID-mapping service** backed by a SQLite write-through cache transl
 
 Listless will be available at `http://localhost:8000`. The SQLite database is persisted in a named Docker volume.
 
+#### Using PostgreSQL
+
+To use PostgreSQL instead of SQLite, uncomment the `listless-pg` and `postgres` services in `docker-compose.yml` (and comment out the default `listless` service), or simply set the `LISTLESS_DATABASE_URL` env var in your `.env`:
+
+```env
+LISTLESS_DATABASE_URL=postgresql+asyncpg://listless:listless@postgres:5432/listless
+```
+
 ### Run Locally
 
 Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/).
@@ -64,7 +72,7 @@ All settings are read from environment variables prefixed with `LISTLESS_` (or f
 | Variable | Default | Description |
 |---|---|---|
 | `LISTLESS_TMDB_API_KEY` | *(empty)* | **Required.** Your TMDB v3 API key — used for ID mapping and TMDB providers. |
-| `LISTLESS_DATABASE_URL` | `sqlite+aiosqlite:////app/data/listless.db` | SQLAlchemy async connection string. |
+| `LISTLESS_DATABASE_URL` | `sqlite+aiosqlite:////app/data/listless.db` | SQLAlchemy async connection string. Use `postgresql+asyncpg://user:pass@host/db` for PostgreSQL. |
 | `LISTLESS_TMDB_API_BASE` | `https://api.themoviedb.org/3` | TMDB API base URL. |
 | `LISTLESS_DEFAULT_HTTP_TIMEOUT` | `20.0` | Default timeout in seconds for upstream HTTP requests. |
 
@@ -131,7 +139,7 @@ Providers follow a simple pattern: implement `name`, `media_type`, and `router()
 
 ## Database & Migrations
 
-Listless uses SQLite via async SQLAlchemy. Tables are created automatically on startup. For schema evolution, [Alembic](https://alembic.sqlalchemy.org/) is configured:
+Listless uses async SQLAlchemy and supports **SQLite** (default) and **PostgreSQL** backends. Tables are created automatically on startup. For schema evolution, [Alembic](https://alembic.sqlalchemy.org/) is configured:
 
 ```bash
 # Generate a new migration after changing models

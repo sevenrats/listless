@@ -14,9 +14,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Inject the database URL from app settings so we have a single source of truth.
-# Strip the async driver ("+aiosqlite") so Alembic uses the sync sqlite3 driver.
-_sync_url = settings.database_url.replace("+aiosqlite", "")
-config.set_main_option("sqlalchemy.url", _sync_url)
+# Convert the async URL to its synchronous counterpart.
+config.set_main_option("sqlalchemy.url", settings.sync_database_url)
 
 target_metadata = Base.metadata
 
